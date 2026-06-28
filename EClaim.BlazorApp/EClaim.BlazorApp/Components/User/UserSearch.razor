@@ -1,0 +1,120 @@
+﻿@page "/user-search"
+@using EClaim.BlazorApp.Models
+@using EClaim.BlazorApp.Models.ViewModel
+@using Microsoft.AspNetCore.Authorization
+@inject IHttpClientFactory HttpClientFactory
+@rendermode InteractiveServer
+@code {
+    private HttpClient Http => HttpClientFactory.CreateClient("EClaimAPI");
+}
+@* @attribute [Authorize] *@
+<PageTitle>User Search</PageTitle>
+<h1>User Search</h1>
+<EditForm OnSubmit="SearchUsers" FormName="UserSearchForm" EditContext="@editContext">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <InputText class="form-control" @bind-Value="searchModel.FullName" placeholder="Full Name" />
+        </div>
+        <div class="col-md-4">
+            <InputText class="form-control" @bind-Value="searchModel.Email" placeholder="Email" />
+        </div>
+        <div class="col-md-4">
+            <InputText class="form-control" @bind-Value="searchModel.Phone" placeholder="Phone" />
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <InputSelect class="form-control" @bind-Value="searchModel.Role">
+                <option value="">-- Select Role --</option>
+                @foreach (var role in searchModel.Roles)
+                {
+                    <option value="@role">@role</option>
+                }
+            </InputSelect>
+        </div>
+
+        <div class="col-md-4">
+            <InputSelect class="form-control" @bind-Value="searchModel.IsEmailVerified">
+                <option value="">-- Email Verified --</option>
+                @foreach (var status in searchModel.UserVerified)
+                {
+                    <option value="@status">@status</option>
+                }
+            </InputSelect>
+        </div>
+
+        <div class="col-md-2">
+            <InputDate class="form-control" @bind-Value="searchModel.FromDate" />
+        </div>
+        <div class="col-md-2">
+            <InputDate class="form-control" @bind-Value="searchModel.ToDate" />
+        </div>
+    </div>
+
+    <button class="btn btn-primary">Search</button>
+</EditForm>
+
+@if (searchModel.Results != null)
+{
+    <UsersList UserList="searchModel.Results"></UsersList>
+}
+
+@code {
+    private UsersSearchViewModel searchModel = new UsersSearchViewModel();
+    private EditContext editContext;
+    private ValidationMessageStore messageStore;
+}
+
+@functions {
+    protected override void OnInitialized()
+    {
+        editContext = new EditContext(searchModel);
+        messageStore = new ValidationMessageStore(editContext);
+
+        SearchUsers();
+    }
+    private void SearchUsers()
+    {
+        messageStore.Clear();
+
+        if (searchModel.FromDate.HasValue && searchModel.ToDate.HasValue &&
+            searchModel.FromDate > searchModel.ToDate)
+        {
+            messageStore.Add(() => searchModel.FromDate, "FromDate cannot be greater than ToDate");
+            messageStore.Add(() => searchModel.ToDate, "ToDate must be greater than or equal to FromDate");
+            editContext.NotifyValidationStateChanged();
+            return;
+        }
+
+
+        bool? IsEmailVerified = null;
+        if (!string.IsNullOrEmpty(searchModel.IsEmailVerified))
+        {
+            IsEmailVerified = searchModel.IsEmailVerified.Equals("Yes") ? true : false;
+        }
+
+        var queryParams = new Dictionary<string, string?>
+                {
+                    { "UserId", searchModel.UserId.ToString() },
+                    { "FullName", searchModel.FullName },
+                    { "Email", searchModel.Email },
+                    { "Phone", searchModel.Phone },
+                    { "Role", searchModel.Role },
+                    { "IsEmailVerified", IsEmailVerified.ToString() },
+                    { "FromDate", searchModel.FromDate?.ToString("yyyy-MMM-dd") },
+                    { "ToDate", searchModel.ToDate?.ToString("yyyy-MMM-dd") },
+                };
+
+        var queryString = string.Join("&", queryParams
+            .Where(kvp => !string.IsNullOrEmpty(kvp.Value))
+            .Select(kvp => $"{kvp.Key}={Uri.EscapeDataString(kvp.Value)}"));
+
+        var url = $"api/Users/GetUsers?{queryString}";
+        var result = Http.GetFromJsonAsync<IEnumerable<UsersViewModel>>(url);
+        searchModel.Results = result.Result;
+    }
+}

@@ -1,0 +1,56 @@
+﻿@page "/Account/login"
+@using EClaim.Application.Models.ViewModel
+@using Microsoft.AspNetCore.Components.Authorization
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider authProvider
+@inject IHttpClientFactory HttpClientFactory
+
+@code {
+    private HttpClient Http => HttpClientFactory.CreateClient("EClaimAPI");
+}
+
+<h3>Login</h3>
+
+<EditForm Model="@loginModel" OnValidSubmit="HandleLogin" FormName="LoginForm">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <InputText class="form-control mb-2" @bind-Value="loginModel.Email" placeholder="Email" />
+    <InputText class="form-control mb-2" @bind-Value="loginModel.Password" placeholder="Password" type="password" />
+
+    <button class="btn btn-primary">Login</button>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="text-danger mt-2">@errorMessage</div>
+    }
+</EditForm>
+
+@code {
+    private LoginViewModel loginModel = new();
+    private string? errorMessage;
+
+
+    private async Task HandleLogin()
+    {
+        errorMessage = null;
+
+        var response = await Http.PostAsJsonAsync("api/auth/login", loginModel);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var result = await response.Content.ReadFromJsonAsync<AuthResponseViewModel>();
+            if (result != null && !string.IsNullOrWhiteSpace(result.Token))
+            {
+                await JS.InvokeVoidAsync("localStorage.setItem", "authToken", result.Token);
+                ((CustomAuthStateProvider)authProvider).NotifyUserAuthentication(result.Token);
+                Navigation.NavigateTo("/");
+            }
+        }
+        else
+        {
+            errorMessage = "Invalid credentials";
+        }
+    }
+}
