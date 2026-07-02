@@ -2,6 +2,7 @@ using E_Claim_Service;
 using EClaim.Domain.Interfaces;
 using EClaim.Infrastructure;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -38,11 +39,20 @@ var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
 {
-    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await DbSeeder.SeedUsersAsync(dbContext);
+    try
+    {
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await dbContext.Database.MigrateAsync();
+        await DbSeeder.SeedUsersAsync(dbContext);
+    }
+    catch (Exception ex)
+    {
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "An error occurred during database migration or seeding");
+    }
 }
 
-app.UseMiddleware<GlobalExceptionMiddleware>(); // 1. Custom error handling — always FIRST
+app.UseMiddleware<GlobalExceptionMiddleware>(); // 1. Custom error handling ï¿½ always FIRST
 
 // Configure the HTTP request pipeline.
 

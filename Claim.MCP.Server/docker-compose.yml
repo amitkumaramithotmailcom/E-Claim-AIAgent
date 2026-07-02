@@ -1,0 +1,13 @@
+version: '3.9'
+
+services:
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      ApiBaseUrl: http://host.docker.internal:5064/
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    stdin_open: true
+    tty: true

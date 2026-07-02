@@ -1,0 +1,3 @@
+---Start MCP Inspector---
+Open a new terminal:
+    npx @modelcontextprotocol/inspector
